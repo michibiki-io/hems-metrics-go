@@ -64,6 +64,13 @@ func main() {
 	engine.GET("/", func(c *gin.Context) {
 		c.JSON(200, "ok")
 	})
+	engine.GET("/readiness", func(c *gin.Context) {
+		if hemsDataController.Readiness() {
+			c.JSON(200, "ok")
+		} else {
+			c.JSON(404, "ng")
+		}
+	})
 	engine.GET("/metrics", controller.CreatePrometheusHandler())
 	engine.Run(":9000")
 }

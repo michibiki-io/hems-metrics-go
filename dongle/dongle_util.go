@@ -136,16 +136,19 @@ func (du *DongleUtil) Fetch(ctx context.Context, f func(result *model.HemsData),
 	r, err := du.dongle.SKSENDTO("1", du.ipv6addr, "0E1A", "1", b)
 	if err != nil {
 		logger.Error("error", zap.Any("err", err))
+		f(nil)
 		return err
 	}
 	a := strings.Split(r, " ")
 	if len(a) != 9 {
 		errmsg := fmt.Sprintf("data length is invalid: %d", len(a))
 		logger.Warn(errmsg)
+		f(nil)
 		return fmt.Errorf(errmsg)
 	}
 	if a[7] != "0024" {
 		logger.Warn(fmt.Sprintf("%s is not 0024. invalid data ? :", a[7]))
+		f(nil)
 		return nil
 	}
 	res := a[8]
@@ -269,6 +272,7 @@ func (du *DongleUtil) Fetch(ctx context.Context, f func(result *model.HemsData),
 
 		select {
 		case <-ctx.Done():
+			f(nil)
 			return nil
 		default:
 			f(result) // output
@@ -276,6 +280,7 @@ func (du *DongleUtil) Fetch(ctx context.Context, f func(result *model.HemsData),
 
 	} else {
 		logger.Warn(fmt.Sprintf("data is invalid, seoj:%v, ESV:%v", seoj, ESV))
+		f(nil)
 		return nil
 	}
 

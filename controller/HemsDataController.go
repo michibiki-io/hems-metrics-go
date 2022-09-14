@@ -21,6 +21,7 @@ type HemsDataController struct {
 	previousData    *model.HemsData
 	nextCronTime    time.Time
 	hemsDataHandler func(model *model.HemsData)
+	readiness       bool
 }
 
 func CreateHemsDataController(l *zap.Logger) *HemsDataController {
@@ -30,6 +31,7 @@ func CreateHemsDataController(l *zap.Logger) *HemsDataController {
 		refreshSecond: time.Duration(goutils.GetIntEnv("REFRESH_SECONDS", 5)) * time.Second,
 		previousData:  nil,
 		nextCronTime:  time.Now(),
+		readiness:     false,
 	}
 }
 
@@ -67,6 +69,10 @@ func (controller *HemsDataController) Collect(ctx context.Context) error {
 	controller.dongle.Disconnect()
 
 	return err
+}
+
+func (controller *HemsDataController) Readiness() bool {
+	return controller.readiness
 }
 
 func (controller *HemsDataController) doCollect(ctx context.Context) error {
@@ -114,25 +120,29 @@ func (controller *HemsDataController) fetch(ctx context.Context, sync chan strin
 }
 
 func (controller *HemsDataController) HemsDataHandler(result *model.HemsData) {
-	if controller.previousData == nil {
-		controller.previousData = result
-	} else if result.DateTime.After(controller.nextCronTime) {
-		powerConsumptionPerUnitTime := result.CumulativePowerConsumption -
-			controller.previousData.CumulativePowerConsumption
-		result.PowerConsumptionPerUnitTime = powerConsumptionPerUnitTime
-		controller.previousData = result
-		controller.nextCronTime = cronexpr.MustParse(cronUnitTime).Next(result.DateTime)
-	} else {
-		result.PowerConsumptionPerUnitTime =
-			controller.previousData.PowerConsumptionPerUnitTime
-	}
-	controller.logger.Debug(fmt.Sprintf("WH: %v [kWh]", result.CumulativePowerConsumption))
-	controller.logger.Debug(fmt.Sprintf("W: %v [W]", result.InstantaneousPowerConsumption))
-	controller.logger.Debug(fmt.Sprintf("A: %v [A]", result.Current))
-	controller.logger.Debug(fmt.Sprintf("PF: %v [%%]", result.PowerFactor))
-	controller.logger.Debug(fmt.Sprintf("WH(last 30min): %v [kwh]", result.PowerConsumptionPerUnitTime))
+	if result != nil {
+		if controller.previousData == nil {
+			controller.previousData = result
+		} else if result.DateTime.After(controller.nextCronTime) {
+			powerConsumptionPerUnitTime := result.CumulativePowerConsumption -
+				controller.previousData.CumulativePowerConsumption
+			result.PowerConsumptionPerUnitTime = powerConsumptionPerUnitTime
+			controller.previousData = result
+			controller.nextCronTime = cronexpr.MustParse(cronUnitTime).Next(result.DateTime)
+		} else {
+			result.PowerConsumptionPerUnitTime =
+				controller.previousData.PowerConsumptionPerUnitTime
+		}
+		controller.logger.Debug(fmt.Sprintf("WH: %v [kWh]", result.CumulativePowerConsumption))
+		controller.logger.Debug(fmt.Sprintf("W: %v [W]", result.InstantaneousPowerConsumption))
+		controller.logger.Debug(fmt.Sprintf("A: %v [A]", result.Current))
+		controller.logger.Debug(fmt.Sprintf("PF: %v [%%]", result.PowerFactor))
+		controller.logger.Debug(fmt.Sprintf("WH(last 30min): %v [kwh]", result.PowerConsumptionPerUnitTime))
 
-	if controller.hemsDataHandler != nil {
-		controller.hemsDataHandler(result)
+		if controller.hemsDataHandler != nil {
+			controller.hemsDataHandler(result)
+		}
+	} else {
+		controller.readiness = false
 	}
 }
