@@ -142,6 +142,7 @@ func (controller *HemsDataController) HemsDataHandler(result *model.HemsData) {
 		if controller.hemsDataHandler != nil {
 			controller.hemsDataHandler(result)
 		}
+		controller.readiness = true
 	} else {
 		controller.readiness = false
 	}
